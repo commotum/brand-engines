@@ -1,0 +1,12 @@
+.env/
+venv/
+__pycache__/
+*.py[cod]
+node_modules/
+frontend/.next/
+frontend/out/
+backend/dist/
+gpt_2/data/
+gpt_2/models/
+*.log
+.DS_Store
