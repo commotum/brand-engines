@@ -1,3 +1,6 @@
 from django.urls import path
+from . import api
 
-urlpatterns = []
+urlpatterns = [
+    path('api/get-models', api.get_models),
+]
