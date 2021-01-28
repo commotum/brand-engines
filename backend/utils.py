@@ -42,3 +42,9 @@ def get_metadata(id: str):
 
 def is_core_model(id: str) -> bool:
     return get_metadata(id).get('core')
+
+def get_model(id: str):
+    return {'name': id, **get_metadata(id)}
+
+def model_exists(id: str) -> bool:
+    return file_exists(join(MODELS_DIR, id))
