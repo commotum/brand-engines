@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from shutil import copytree, copyfile
 from backend import GPT_2_PATH, MODELS_DIR
 from backend.metadata import handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
+from gpt_2.src.encode import encode, Args as EncodeArgs
 
 
 MODEL_OUTPUT = 'output.log'
@@ -66,7 +67,7 @@ def delete_file(path: str):
     if exists(path):
         remove(path)
 
-def fork_model(id: str, new_id: str, amount: int = None) -> bool:
+def fork_model(id: str, new_id: str, dataset: str = None, file_name: str = None, amount: int = None) -> bool:
     path = join(GPT_2_PATH, 'models')
     checkpoint_path = join(GPT_2_PATH, 'checkpoint')
     dir_path = join(path, id)
@@ -92,6 +93,18 @@ def fork_model(id: str, new_id: str, amount: int = None) -> bool:
         if re.search("^(events.*)|(counter)$", file):
             delete_file(join(path, new_dir_path, file))
 
-    handle_metadata(new_id, id, None)
+    handle_metadata(new_id, id, file_name)
+
+    if dataset:
+        encode_dataset(new_id, dataset)
+
+    return True
+
+def encode_dataset(id: str, dataset: str) -> bool:
+    txt_dataset = f"{MODEL_DATASET}.txt"
+    with open(join(GPT_2_PATH, 'models', id, txt_dataset), "w") as dataset_file:
+        dataset_file.write(dataset)
+    encode(EncodeArgs({'model_name': id, 'in_text': join(GPT_2_PATH, 'models', id, txt_dataset),
+                       'out_nzp': join(GPT_2_PATH, 'models', id, MODEL_DATASET)}))
 
     return True

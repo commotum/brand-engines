@@ -24,9 +24,13 @@ def fork_model(req: HttpRequest):
         return utils.error_json_response({'error': 'Param id is required'}, 400)
     if 'new_id' not in req.GET:
         return utils.error_json_response({'error': 'Param new_id is required'}, 400)
+    if not req.body:
+        return utils.error_json_response({'error': 'Dataset not provided'}, 400)
     id = req.GET['id']
+    file_name = req.GET['fileName'] if 'fileName' in req.GET else ''
     count = req.GET['count'] if 'count' in req.GET else None
     new_id = req.GET['new_id']
+    dataset = req.body.decode('utf-8')
 
     if not utils.model_exists(id):
         return utils.error_json_response({'error': 'Model do not exists'}, 400)
@@ -34,4 +38,4 @@ def fork_model(req: HttpRequest):
     if utils.model_exists(new_id):
         return utils.error_json_response({'error': 'New model name is taken'}, 400)
 
-    return utils.json_response({'success': utils.fork_model(id, new_id, amount=count)})
+    return utils.json_response({'success': utils.fork_model(id, new_id, dataset, file_name, count)})
