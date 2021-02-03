@@ -1,9 +1,11 @@
 from os.path import join, exists
-from os import listdir
+from os import listdir, remove
 import json
+import re
 from django.http import JsonResponse
-from backend import MODELS_DIR
-from backend.metadata import MODEL_METADATA_FILE
+from shutil import copytree, copyfile
+from backend import GPT_2_PATH, MODELS_DIR
+from backend.metadata import handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
 
 
 MODEL_OUTPUT = 'output.log'
@@ -48,3 +50,48 @@ def get_model(id: str):
 
 def model_exists(id: str) -> bool:
     return file_exists(join(MODELS_DIR, id))
+
+def copy_dir(path: str, new_path: str):
+    return copytree(path, new_path)
+
+def copy_dir_content(path: str, new_path: str):
+    for file_name in list_dir(path):
+        file_path = join(path, file_name)
+        new_file_path = join(new_path, file_name)
+        if file_exists(new_file_path):
+            delete_file(new_file_path)
+        copyfile(file_path, new_file_path)
+
+def delete_file(path: str):
+    if exists(path):
+        remove(path)
+
+def fork_model(id: str, new_id: str, amount: int = None) -> bool:
+    path = join(GPT_2_PATH, 'models')
+    checkpoint_path = join(GPT_2_PATH, 'checkpoint')
+    dir_path = join(path, id)
+    new_dir_path = join(path, new_id)
+    copy_dir(dir_path, new_dir_path)
+    checkpoint = join(checkpoint_path, id)
+    if file_exists(checkpoint):
+        files = list_dir(new_dir_path)
+        for file in files:
+            if re.search("^model.*$", file):
+                delete_file(join(path, new_dir_path, file))
+        copy_dir_content(checkpoint, join(path, new_id))
+    counter = amount if amount else get_counter(id)
+    if counter:
+        files = list_dir(new_dir_path)
+        for file in files:
+            if "model-" in file and f"model-{counter}" not in file:
+                delete_file(join(path, new_dir_path, file))
+        handle_checkpoint_metadata(new_id, counter)
+        update_steps(new_id, id, counter)
+    files = list_dir(new_dir_path)
+    for file in files:
+        if re.search("^(events.*)|(counter)$", file):
+            delete_file(join(path, new_dir_path, file))
+
+    handle_metadata(new_id, id, None)
+
+    return True

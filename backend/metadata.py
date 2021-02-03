@@ -91,3 +91,9 @@ def update_metadata_steps(id: str):
     current_history_item['updated'] = floor(time())
     metadata['history'] = [current_history_item, *history[1:]]
     return update_metadata(id, metadata)
+
+def handle_checkpoint_metadata(id: str, checkpoint: str):
+    with open(join(MODELS_DIR, id, CHECKPOINT_METADATA), "w") as file:
+        file.write(f"""model_checkpoint_path: \"model-{checkpoint}\"
+all_model_checkpoint_paths: \"model-{checkpoint}\"
+""")
