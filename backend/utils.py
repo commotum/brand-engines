@@ -3,10 +3,11 @@ from os import listdir, remove
 import json
 import re
 from django.http import JsonResponse
-from shutil import copytree, copyfile
+from shutil import rmtree, copytree, copyfile
 from backend import GPT_2_PATH, MODELS_DIR
-from backend.metadata import handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
+from backend.metadata import update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
 from gpt_2.src.encode import encode, Args as EncodeArgs
+from gpt_2.src.generate_samples import sample_model
 
 
 MODEL_OUTPUT = 'output.log'
@@ -108,3 +109,27 @@ def encode_dataset(id: str, dataset: str) -> bool:
                        'out_nzp': join(GPT_2_PATH, 'models', id, MODEL_DATASET)}))
 
     return True
+
+def delete_dir(path: str):
+    if exists(path):
+        rmtree(path)
+
+def generate_model(id: str, length: int, temp: float = 1.0, top_k: float = 0, input: str = None,
+                   amount: int = None) -> str:
+    generate_model_name = f"generate-{id}"
+    if exists(join(GPT_2_PATH, 'models', generate_model_name)):
+        delete_dir(join(GPT_2_PATH, 'models', generate_model_name))
+    fork_model(id, generate_model_name, amount=amount)
+    delete_file(join(GPT_2_PATH, 'models', generate_model_name, MODEL_OUTPUT))
+    samples = sample_model(nsamples=1, input=input, model_name=generate_model_name, length=float(length),
+                           temperature=float(temp),
+                           top_k=float(top_k))
+
+    sample = []
+    for line in samples:
+        if not re.search("^.*=+.*=+.*$", line):
+            sample.append(line)
+    delete_dir(join(GPT_2_PATH, 'models', generate_model_name))
+
+    update_metadata_steps(id)
+    return "".join(sample)

@@ -39,3 +39,20 @@ def fork_model(req: HttpRequest):
         return utils.error_json_response({'error': 'New model name is taken'}, 400)
 
     return utils.json_response({'success': utils.fork_model(id, new_id, dataset, file_name, count)})
+
+def generate_model(req: HttpRequest):
+    if req.method != 'GET':
+        return utils.error_json_response({'error': 'Only get allowed'}, 400)
+    if 'id' not in req.GET:
+        return utils.error_json_response({'error': 'Param id is required'}, 400)
+    id = req.GET['id']
+    length = req.GET['length'] if 'length' in req.GET else 50
+    count = req.GET['count'] if 'count' in req.GET else None
+    text = req.GET['input'] if 'input' in req.GET else ""
+    top_k = req.GET['top_k'] if 'top_k' in req.GET else 0
+    temperature = req.GET['temperature'] if 'top_k' in req.GET else 1
+
+    if not utils.model_exists(id):
+        return utils.error_json_response({'error': 'Model do not exists'}, 400)
+
+    return utils.json_response(utils.generate_model(id, length, temperature, top_k, text, count))
