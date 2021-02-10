@@ -5,9 +5,10 @@ import re
 from django.http import JsonResponse
 from shutil import rmtree, copytree, copyfile
 from backend import GPT_2_PATH, MODELS_DIR
-from backend.metadata import update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
+from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
 from gpt_2.src.encode import encode, Args as EncodeArgs
 from gpt_2.src.generate_samples import sample_model
+from gpt_2.src.train import train, Args as TrainArgs
 
 
 MODEL_OUTPUT = 'output.log'
@@ -133,3 +134,12 @@ def generate_model(id: str, length: int, temp: float = 1.0, top_k: float = 0, in
 
     update_metadata_steps(id)
     return "".join(sample)
+
+def train_model(id: str, every: str, steps: str) -> bool:
+    update_metadata(id, {"training": True})
+    train(TrainArgs(
+        {'dataset': join(GPT_2_PATH, 'models', id, MODEL_DATASET), 'sample_every': int(every), 'save_every': int(every),
+         'steps_num': int(steps), 'model_name': id, 'run_name': id, 'output_file': MODEL_OUTPUT}))
+    update_metadata(id, {"training": False})
+    update_metadata_steps(id)
+    return True

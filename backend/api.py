@@ -56,3 +56,21 @@ def generate_model(req: HttpRequest):
         return utils.error_json_response({'error': 'Model do not exists'}, 400)
 
     return utils.json_response(utils.generate_model(id, length, temperature, top_k, text, count))
+
+def train_model(req: HttpRequest):
+    if req.method != 'POST':
+        return utils.error_json_response({'error': 'Only post allowed'}, 400)
+    if 'id' not in req.GET:
+        return utils.error_json_response({'error': 'Param id is required'}, 400)
+    if 'steps' not in req.GET:
+        return utils.error_json_response({'error': 'Param steps is required'}, 400)
+    if 'every' not in req.GET:
+        return utils.error_json_response({'error': 'Param every is required'}, 400)
+    id = req.GET['id']
+    steps = req.GET['steps']
+    every = req.GET['every']
+
+    if not utils.model_exists(id):
+        return utils.error_json_response({'error': 'Model do not exists'}, 400)
+
+    return utils.json_response({'success': utils.train_model(id, every, steps)})

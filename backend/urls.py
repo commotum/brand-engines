@@ -6,4 +6,5 @@ urlpatterns = [
     path('api/get-model', api.get_model),
     path('api/fork-model', api.fork_model),
     path('api/generate-model', api.generate_model),
+    path('api/train-model', api.train_model),
 ]
