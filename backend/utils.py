@@ -143,3 +143,10 @@ def train_model(id: str, every: str, steps: str) -> bool:
     update_metadata(id, {"training": False})
     update_metadata_steps(id)
     return True
+
+def read_train_model(id: str, amount: int = 100) -> bool:
+    ret = []
+    with open(join(GPT_2_PATH, 'models', id, MODEL_OUTPUT), "r") as out:
+        for line in (out.readlines()[-amount:]):
+            ret.append(line.replace("\n", ""))
+    return ret
