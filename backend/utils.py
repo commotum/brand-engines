@@ -2,9 +2,10 @@ from os.path import join, exists
 from os import listdir, remove
 import json
 import re
+from typing import Dict
 from django.http import JsonResponse
 from shutil import rmtree, copytree, copyfile
-from backend import GPT_2_PATH, MODELS_DIR
+from backend import GPT_2_PATH, MODELS_DIR, CHECKPOINT_DIR
 from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
 from gpt_2.src.encode import encode, Args as EncodeArgs
 from gpt_2.src.generate_samples import sample_model
@@ -149,4 +150,35 @@ def read_train_model(id: str, amount: int = 100) -> bool:
     with open(join(GPT_2_PATH, 'models', id, MODEL_OUTPUT), "r") as out:
         for line in (out.readlines()[-amount:]):
             ret.append(line.replace("\n", ""))
+    return ret
+
+def get_model_samples(id: str, count: int = None) -> Dict:
+    path = join(GPT_2_PATH, 'samples')
+    if not exists(path):
+        return {}
+    samples_path = join(path, id)
+    checkpoint_path = join(CHECKPOINT_DIR, id, )
+    if not exists(samples_path):
+        return {}
+
+    ret = {}
+    files = list_dir(samples_path)
+    for file in files:
+        *rest, number_str = file.split('-')
+        if not count or int(number_str) <= int(count):
+            ret[number_str] = {'data': [], 'loss': -1, 'avg_loss': -1}
+            with open(join(samples_path, file), "r") as out:
+                for line in out.readlines():
+                    if re.search("^.*=+.*=+.*$", line):
+                        ret[number_str]['data'].append("")
+                    else:
+                        if len(ret[number_str]['data']) == 0:
+                            ret[number_str]['data'].append("")
+                        ret[number_str]['data'][-1] += line
+            if exists(checkpoint_path) and exists(join(checkpoint_path, f"metadata-{number_str}.json")):
+                with open(join(checkpoint_path, f"metadata-{number_str}.json"), 'r') as metadata:
+                    data = json.load(metadata)
+                    ret[number_str]['loss'] = data.get('loss', -1)
+                    ret[number_str]['avg_loss'] = data.get('avg_loss', -1)
+
     return ret

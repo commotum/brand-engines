@@ -87,3 +87,16 @@ def read_train_model(req: HttpRequest):
         return utils.error_json_response({'error': 'Model do not exists'}, 400)
 
     return utils.json_response(utils.read_train_model(id, amount))
+
+def get_model_samples(req: HttpRequest):
+    if req.method != 'GET':
+        return utils.error_json_response({'error': 'Only get allowed'}, 400)
+    if 'id' not in req.GET:
+        return utils.error_json_response({'error': 'Param id is required'}, 400)
+    id = req.GET['id']
+    amount = req.GET['amount'] if 'amount' in req.GET else None
+
+    if not utils.model_exists(id):
+        return utils.error_json_response({'error': 'Model do not exists'}, 400)
+
+    return utils.json_response(utils.get_model_samples(id, amount))
