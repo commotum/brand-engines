@@ -1,12 +1,12 @@
 from os.path import join, exists
-from os import listdir, remove
+from os import listdir, rename, remove
 import json
 import re
 from typing import Dict
 from django.http import JsonResponse
 from shutil import rmtree, copytree, copyfile
 from backend import GPT_2_PATH, MODELS_DIR, CHECKPOINT_DIR
-from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, update_steps
+from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, handle_checkpoint_metadata, rename_metadata, update_steps
 from gpt_2.src.encode import encode, Args as EncodeArgs
 from gpt_2.src.generate_samples import sample_model
 from gpt_2.src.train import train, Args as TrainArgs
@@ -182,3 +182,28 @@ def get_model_samples(id: str, count: int = None) -> Dict:
                     ret[number_str]['avg_loss'] = data.get('avg_loss', -1)
 
     return ret
+
+def rename_file(path: str, new_path: str):
+    return rename(path, new_path)
+
+def rename_model(id: str, new_id: str) -> bool:
+    path = join(GPT_2_PATH, 'models')
+    checkpoint_path = join(GPT_2_PATH, 'checkpoint')
+    samples_path = join(GPT_2_PATH, 'samples')
+    dir_path = join(path, id)
+    new_dir_path = join(path, new_id)
+    rename_file(dir_path, new_dir_path)
+    if exists(checkpoint_path):
+        checkpoint = join(checkpoint_path, id)
+        new_checkpoint = join(checkpoint_path, new_id)
+        if file_exists(checkpoint):
+            rename_file(checkpoint, new_checkpoint)
+
+    if exists(samples_path):
+        sample = join(samples_path, id)
+        new_sample = join(samples_path, new_id)
+        if file_exists(sample):
+            rename_file(sample, new_sample)
+    rename_metadata(new_id, new_id)
+
+    return True

@@ -97,3 +97,14 @@ def handle_checkpoint_metadata(id: str, checkpoint: str):
         file.write(f"""model_checkpoint_path: \"model-{checkpoint}\"
 all_model_checkpoint_paths: \"model-{checkpoint}\"
 """)
+
+def rename_metadata(id: str, new_id: str) -> Dict:
+    metadata = get_metadata(id)
+    history = metadata.get('history', [])
+    if len(history) <= 0:
+        return None
+
+    current_history_item = history[0]
+    current_history_item['id'] = new_id
+    metadata['history'] = [current_history_item, *history[1:]]
+    return update_metadata(id, metadata)

@@ -100,3 +100,21 @@ def get_model_samples(req: HttpRequest):
         return utils.error_json_response({'error': 'Model do not exists'}, 400)
 
     return utils.json_response(utils.get_model_samples(id, amount))
+
+def rename_model(req: HttpRequest):
+    if req.method != 'POST':
+        return utils.error_json_response({'error': 'Only post allowed'}, 400)
+    if 'id' not in req.GET:
+        return utils.error_json_response({'error': 'Param id is required'}, 400)
+    if 'new_id' not in req.GET:
+        return utils.error_json_response({'error': 'Param new_id is required'}, 400)
+    id = req.GET['id']
+    new_id = req.GET['new_id']
+
+    if not utils.model_exists(id):
+        return utils.error_json_response({'error': 'Model do not exists'}, 400)
+
+    if utils.model_exists(new_id):
+        return utils.error_json_response({'error': 'New model name is taken'}, 400)
+
+    return utils.json_response({'success': utils.rename_model(id, new_id)})
