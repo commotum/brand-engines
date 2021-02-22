@@ -118,3 +118,18 @@ def rename_model(req: HttpRequest):
         return utils.error_json_response({'error': 'New model name is taken'}, 400)
 
     return utils.json_response({'success': utils.rename_model(id, new_id)})
+
+def delete_model(req: HttpRequest):
+    if req.method != 'DELETE':
+        return utils.error_json_response({'error': 'Only delete allowed'}, 400)
+    if 'id' not in req.GET:
+        return utils.error_json_response({'error': 'Param id is required'}, 400)
+    id = req.GET['id']
+
+    if not utils.model_exists(id):
+        return utils.error_json_response({'error': 'Model do not exists'}, 400)
+
+    if utils.is_core_model(id):
+        return utils.error_json_response({'error': 'Core model deletion forbidden'}, 403)
+
+    return utils.json_response({'success': utils.delete_model(id)})

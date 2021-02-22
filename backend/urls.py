@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/read-train-model', api.read_train_model),
     path('api/get-model-steps', api.get_model_samples),
     path('api/rename-model', api.rename_model),
+    path('api/delete-model', api.delete_model),
 ]

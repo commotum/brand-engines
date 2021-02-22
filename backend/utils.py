@@ -207,3 +207,12 @@ def rename_model(id: str, new_id: str) -> bool:
     rename_metadata(new_id, new_id)
 
     return True
+
+def delete_model(id: str) -> bool:
+    model_path = join(GPT_2_PATH, 'models')
+    checkpoint_path = join(GPT_2_PATH, 'checkpoint')
+    samples_path = join(GPT_2_PATH, 'samples')
+    delete_dir(join(model_path, id))
+    delete_dir(join(checkpoint_path, id))
+    delete_dir(join(samples_path, id))
+    return True
