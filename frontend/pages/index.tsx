@@ -53,7 +53,7 @@ const Index: NextPage<Props> = () => {
   }
   return (
     <Wrap>
-      <TopPanel />
+      <TopPanel onSearch={onSearch} onSort={onSort} />
       <ItemGrid
         items={data}
       />

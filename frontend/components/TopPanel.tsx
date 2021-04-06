@@ -3,6 +3,7 @@ import styled, { css } from 'styled-components'
 
 import { Logo } from './Logo'
 import { Select } from './Select'
+import { Search } from './Search'
 import { ROUTES } from '../utils/constants'
 import { SortKey } from '../@types/types'
 
@@ -131,6 +132,7 @@ export const TopPanel: React.FC<Props> = ({
   }
   return (
     <Wrap className={className} data-testid="topPanel">
+      <Search onChange={onSearch} />
       <SLogo />
       <SSelect onChange={onSort} />
     </Wrap>
