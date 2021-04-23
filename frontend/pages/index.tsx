@@ -33,6 +33,12 @@ const Index: NextPage<Props> = () => {
 
 
 
+  const onGenerate = React.useCallback(
+    async (id: string) => {
+      await router.push(getGenerateRoute(id))
+    },
+    [router],
+  )
 
 
   if (isLoading) {
@@ -55,6 +61,7 @@ const Index: NextPage<Props> = () => {
     <Wrap>
       <TopPanel onSearch={onSearch} onSort={onSort} />
       <ItemGrid
+        onGenerate={onGenerate}
         items={data}
       />
     </Wrap>
