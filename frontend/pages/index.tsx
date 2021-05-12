@@ -80,6 +80,12 @@ const Index: NextPage<Props> = () => {
     [router],
   )
 
+  const onHistory = React.useCallback(
+    async (id: string) => {
+      await router.push(getHistoryRoute(id))
+    },
+    [router],
+  )
 
   if (isLoading) {
     return (
@@ -103,6 +109,7 @@ const Index: NextPage<Props> = () => {
       <ItemGrid
         onTrain={onTrain}
         onGenerate={onGenerate}
+        onHistory={onHistory}
         items={data}
       />
       <TrainOptionModal
