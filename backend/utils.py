@@ -1,19 +1,21 @@
 from os.path import join, exists
-from os import listdir, rename, remove
+from os import listdir, rename
 import json
 import re
 from typing import Dict
 
 from django.http import JsonResponse
 
-from shutil import rmtree, copytree, copyfile
+from shutil import rmtree, copyfile, disk_usage
+from pathlib import Path
+import math
 
 from backend import GPT_2_PATH, MODELS_DIR, CHECKPOINT_DIR
-from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, get_counter, MODEL_METADATA_FILE, \
-    handle_checkpoint_metadata, rename_metadata, update_steps
+from backend.metadata import update_metadata, update_metadata_steps, handle_metadata, MODEL_METADATA_FILE, \
+    rename_metadata, update_steps
 from gpt_2.src.encode import encode, Args as EncodeArgs
-from gpt_2.src.generate_samples import sample_model
-from gpt_2.src.train import train, Args as TrainArgs
+from gpt_2.src.checkpoints import resolve as resolve_checkpoint
+from backend.local_runtime import exclusive, run_worker
 
 MODEL_OUTPUT = 'output.log'
 MODEL_DATASET = 'dataset.npz'
@@ -29,19 +31,6 @@ def error_json_response(data, status=500):
 
 def list_dir(path: str):
     return listdir(path)
-
-
-def copy_dir(path: str, new_path: str):
-    return copytree(path, new_path)
-
-
-def copy_dir_content(path: str, new_path: str):
-    for file_name in list_dir(path):
-        file_path = join(path, file_name)
-        new_file_path = join(new_path, file_name)
-        if file_exists(new_file_path):
-            delete_file(new_file_path)
-        copyfile(file_path, new_file_path)
 
 
 def file_exists(path: str):
@@ -63,15 +52,14 @@ def delete_dir(path: str):
         rmtree(path)
 
 
-def delete_file(path: str):
-    if exists(path):
-        remove(path)
-
-
 def list_models():
+    if not exists(MODELS_DIR):
+        return []
     dir_list = list_dir(MODELS_DIR)
     ret = []
     for dir in dir_list:
+        if dir.startswith('.') or not Path(MODELS_DIR, dir).is_dir():
+            continue
         ret.append({'name': dir, **get_metadata(dir)})
     return ret
 
@@ -87,10 +75,11 @@ def model_exists(id: str) -> bool:
 def get_metadata(id: str):
     metadata_path = join(MODELS_DIR, id, MODEL_METADATA_FILE)
     if not file_exists(metadata_path):
-        return {'core': True}
+        return {'core': True, 'history': []}
     return get_file_json(metadata_path)
 
 
+@exclusive
 def rename_model(id: str, new_id: str) -> bool:
     path = join(GPT_2_PATH, 'models')
     checkpoint_path = join(GPT_2_PATH, 'checkpoint')
@@ -114,6 +103,7 @@ def rename_model(id: str, new_id: str) -> bool:
     return True
 
 
+@exclusive
 def delete_model(id: str) -> bool:
     model_path = join(GPT_2_PATH, 'models')
     checkpoint_path = join(GPT_2_PATH, 'checkpoint')
@@ -124,13 +114,33 @@ def delete_model(id: str) -> bool:
     return True
 
 
+@exclusive
 def train_model(id: str, every: str, steps: str) -> bool:
+    every, steps = int(every), int(steps)
+    if every < 1 or steps < 1:
+        raise ValueError('Steps and sampling interval must be positive integers')
+    dataset = join(MODELS_DIR, id, MODEL_DATASET)
+    if not exists(dataset):
+        raise ValueError('Fork this model with a training dataset first')
+    prefix = Path(resolve_checkpoint(id))
+    checkpoint_bytes = sum(p.stat().st_size for p in prefix.parent.glob(prefix.name + '.*'))
+    saves = (steps + every - 1) // every
+    required = saves * checkpoint_bytes + 1024**3
+    if disk_usage(MODELS_DIR).free < required:
+        raise ValueError(f'This run needs about {required / 1024**3:.1f} GiB for {saves} new checkpoints. '
+                         'Free disk space or save less frequently.')
     update_metadata(id, {"training": True})
-    train(TrainArgs(
-        {'dataset': join(GPT_2_PATH, 'models', id, MODEL_DATASET), 'sample_every': int(every), 'save_every': int(every),
-         'steps_num': int(steps), 'model_name': id, 'run_name': id, 'output_file': MODEL_OUTPUT}))
-    update_metadata(id, {"training": False})
-    update_metadata_steps(id)
+    try:
+        run_worker('train', {'dataset': dataset, 'sample_every': every, 'save_every': every,
+                            'steps_num': steps, 'model_name': id, 'run_name': id,
+                            'output_file': MODEL_OUTPUT})
+    except Exception as error:
+        with open(join(MODELS_DIR, id, MODEL_OUTPUT), 'a') as log:
+            log.write(f'\nTraining failed: {error}\n')
+        raise
+    finally:
+        update_metadata(id, {"training": False})
+        update_metadata_steps(id)
     return True
 
 
@@ -146,6 +156,11 @@ def encode_dataset(id: str, dataset: str) -> bool:
 
 def read_train_model(id: str, amount: int = 100) -> bool:
     ret = []
+    if not exists(join(MODELS_DIR, id, MODEL_OUTPUT)):
+        return []
+    amount = int(amount)
+    if amount < 1:
+        raise ValueError('Log line count must be positive')
     with open(join(GPT_2_PATH, 'models', id, MODEL_OUTPUT), "r") as out:
         for line in (out.readlines()[-amount:]):
             ret.append(line.replace("\n", ""))
@@ -156,54 +171,44 @@ def is_core_model(id: str) -> bool:
     return get_metadata(id).get('core')
 
 
+@exclusive
 def fork_model(id: str, new_id: str, dataset: str = None, file_name: str = None, amount: int = None) -> bool:
-    path = join(GPT_2_PATH, 'models')
-    checkpoint_path = join(GPT_2_PATH, 'checkpoint')
-    dir_path = join(path, id)
-    new_dir_path = join(path, new_id)
-    copy_dir(dir_path, new_dir_path)
-    checkpoint = join(checkpoint_path, id)
-    if file_exists(checkpoint):
-        files = list_dir(new_dir_path)
-        for file in files:
-            if re.search("^model.*$", file):
-                delete_file(join(path, new_dir_path, file))
-        copy_dir_content(checkpoint, join(path, new_id))
-    counter = amount if amount else get_counter(id)
-    if counter:
-        files = list_dir(new_dir_path)
-        for file in files:
-            if "model-" in file and f"model-{counter}" not in file:
-                delete_file(join(path, new_dir_path, file))
-        handle_checkpoint_metadata(new_id, counter)
-        update_steps(new_id, id, counter)
-    files = list_dir(new_dir_path)
-    for file in files:
-        if re.search("^(events.*)|(counter)$", file):
-            delete_file(join(path, new_dir_path, file))
-
-    handle_metadata(new_id, id, file_name)
-
-    if dataset:
-        encode_dataset(new_id, dataset)
-
+    source = Path(MODELS_DIR) / id
+    target = Path(MODELS_DIR) / new_id
+    prefix = Path(resolve_checkpoint(id, amount))
+    files = [p for p in source.iterdir() if p.is_file() and
+             not p.name.startswith(('model', 'events', 'metadata-')) and
+             p.name not in ('checkpoint', 'counter', MODEL_OUTPUT)]
+    weights = list(prefix.parent.glob(prefix.name + '.*'))
+    if disk_usage(MODELS_DIR).free < sum(p.stat().st_size for p in files + weights) + 1024**3:
+        raise ValueError('Not enough free disk space to fork these weights')
+    target.mkdir()
+    try:
+        for file in files + weights:
+            copyfile(file, target / file.name)
+        (target / 'checkpoint').write_text(f'model_checkpoint_path: "{prefix.name}"\n')
+        counter = int(prefix.name.split('-')[1]) if prefix.parent != source and prefix.name.startswith('model-') else 0
+        if counter:
+            update_steps(new_id, id, counter)
+        handle_metadata(new_id, id, file_name)
+        if dataset:
+            encode_dataset(new_id, dataset)
+    except Exception:
+        rmtree(target)
+        raise
     return True
 
 
+@exclusive
 def generate_model(id: str, length: int, temp: float = 1.0, top_k: float = 0, input: str = None,
                    amount: int = None) -> str:
-    generate_model_name = f"{id}"
-    samples = sample_model(nsamples=1, input=input, model_name=id, length=float(length),
-                           temperature=float(temp),
-                           top_k=float(top_k))
-
-    sample = []
-    for line in samples:
-        if not re.search("^.*=+.*=+.*$", line):
-            sample.append(line)
-
-    update_metadata_steps(id)
-    return "".join(sample)
+    length, top_k, temp = int(length), int(top_k), float(temp)
+    if length < 1 or length > 1023 or top_k < 0 or top_k > 50257 or not math.isfinite(temp) or temp <= 0:
+        raise ValueError('Use length 1–1023, top-k 0–50257 and a positive temperature')
+    checkpoint = resolve_checkpoint(id, amount)
+    samples = run_worker('generate', dict(nsamples=1, input=input, model_name=id, length=length,
+                                          temperature=temp, top_k=top_k, checkpoint=checkpoint))
+    return "".join(line for line in samples if not re.search("^.*=+.*=+.*$", line))
 
 
 def get_model_samples(id: str, count: int = None) -> Dict:

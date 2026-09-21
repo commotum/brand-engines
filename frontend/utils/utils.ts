@@ -65,8 +65,10 @@ export const fetchReq = async <T>(
     headers: { ...headers },
     body,
   })
-    .then((res) => {
+    .then(async (res) => {
       if (res.status >= 400) {
+        const detail = await res.json().catch(() => null)
+        window.alert(detail?.error || `Model operation failed (${res.status})`)
         return null
       }
       return res.json()

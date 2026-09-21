@@ -1,22 +1,22 @@
 import useSWR from 'swr'
 
 import { fetcher } from '../utils'
-import { BASE_URL } from '../constants'
+import { BASE_URL, getModelDisplayName } from '../constants'
 import { Model, SortKey } from '../../@types/types'
 
 const sortByName = (a: Model, b: Model) => {
-  if (a.name < b.name) {
+  if (getModelDisplayName(a.name) < getModelDisplayName(b.name)) {
     return -1
   }
-  if (a.name > b.name) {
+  if (getModelDisplayName(a.name) > getModelDisplayName(b.name)) {
     return 1
   }
   return 0
 }
 
 const sortByTime = (a: Model, b: Model) => {
-  const aTime = a.history?.[0].created || 0
-  const bTime = b.history?.[0].created || 0
+  const aTime = a.history?.[0]?.created || 0
+  const bTime = b.history?.[0]?.created || 0
   if (aTime < bTime) {
     return -1
   }
@@ -70,10 +70,14 @@ export function useModels(
   )
   return {
     data: data
-      ?.filter((item) => item.name.match(new RegExp(regex, 'i')))
+      ?.filter((item) =>
+        `${getModelDisplayName(item.name)} ${item.name}`.match(
+          new RegExp(regex, 'i'),
+        ),
+      )
       .sort(SORTERS[sortBy]),
-    isLoading: !error && !data,
-    isError: error,
+    isLoading: !error && data === undefined,
+    isError: error || data === null,
     refresh: mutate,
   }
 }

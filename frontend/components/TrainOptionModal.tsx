@@ -50,7 +50,9 @@ export const TrainOptionModal: React.FC<Props> = ({
   if (isError || !data) {
     return (
       <Modal isOpen={isOpen} onClose={onClose} className={className}>
-        Somethings broken... :(
+        <p role="alert">
+          Could not load the model. Close this dialog and try again.
+        </p>
       </Modal>
     )
   }
@@ -61,7 +63,7 @@ export const TrainOptionModal: React.FC<Props> = ({
         onClick={data.training ? onTrain : onContinue}
         data-testid="generateModalContinue"
       >
-        Continue Training
+        {data.training ? 'View training' : 'Continue Training'}
       </SButton>
       <Button onClick={onNewBranch} data-testid="generateModalNewBranch">
         Create New Branch

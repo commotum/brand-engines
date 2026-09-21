@@ -77,6 +77,7 @@ const TitleButton = styled.button(
 type Props = {
   title: string
   loading?: boolean
+  error?: boolean
   checkpoints: { id: string; title: string; samples: string[] }[]
   onGenerate(id: string): void
   onFork(id: string): void
@@ -86,6 +87,7 @@ type Props = {
 export const Model: React.FC<Props> = ({
   className,
   loading,
+  error,
   title,
   onFork,
   onGenerate,
@@ -105,6 +107,10 @@ export const Model: React.FC<Props> = ({
         <Folder />
         {loading ? <Throbber /> : title}
       </TitleButton>
+      {error && <p role="alert">Could not load checkpoints.</p>}
+      {!loading && !error && checkpoints.length === 0 && (
+        <p>No saved checkpoints yet.</p>
+      )}
       <InnerWrap>
         {checkpoints.map(({ id, title, samples }) => (
           <Checkpoint
@@ -139,7 +145,7 @@ export const SmartModel: React.FC<SmartProps> = ({
   title,
 }) => {
   const router = useRouter()
-  const { data = [], isLoading } = useSteps(id, amount)
+  const { data = [], isLoading, isError } = useSteps(id, amount)
   const onGenerate = React.useCallback(
     async (count: string) => {
       await router.push(getGenerateRoute(id, count))
@@ -158,6 +164,7 @@ export const SmartModel: React.FC<SmartProps> = ({
     <Model
       title={title}
       loading={isLoading}
+      error={Boolean(isError)}
       onGenerate={onGenerate}
       onFork={onForkClick}
       checkpoints={Object.entries(data || {}).map(

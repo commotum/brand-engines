@@ -17,6 +17,8 @@ type Props = {
   onClose(): void
   onDelete(): void
   className?: string
+  isLoading?: boolean
+  error?: string
 }
 
 export const DeleteModal: React.FC<Props> = ({
@@ -24,6 +26,8 @@ export const DeleteModal: React.FC<Props> = ({
   className,
   onClose,
   onDelete,
+  isLoading,
+  error,
 }) => {
   return (
     <Modal
@@ -33,9 +37,14 @@ export const DeleteModal: React.FC<Props> = ({
       className={className}
     >
       <Text>Are you sure you want to delete?</Text>
+      {error && <p role="alert">{error}</p>}
       <ModalButtons
-        cancel={{ text: 'Cancel', fn: onClose }}
-        confirm={{ text: 'Delete', fn: onDelete }}
+        cancel={{ text: 'Cancel', fn: onClose, disabled: isLoading }}
+        confirm={{
+          text: isLoading ? 'Deleting…' : 'Delete',
+          fn: onDelete,
+          disabled: isLoading,
+        }}
       />
     </Modal>
   )

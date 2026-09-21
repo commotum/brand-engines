@@ -15,8 +15,8 @@ const SSecButton = styled(SecButton)`
 `
 
 type Props = {
-  confirm?: { text: string; fn: () => void }
-  cancel?: { text: string; fn: () => void }
+  confirm?: { text: string; fn: () => void; disabled?: boolean }
+  cancel?: { text: string; fn: () => void; disabled?: boolean }
   className?: string
 }
 
@@ -42,6 +42,7 @@ export const ModalButtons: React.FC<Props> = ({
           type="button"
           data-testid="modalButtonsCancel"
           onClick={onCancel}
+          disabled={cancel.disabled}
         >
           {cancel.text}
         </SSecButton>
@@ -51,6 +52,7 @@ export const ModalButtons: React.FC<Props> = ({
           type="submit"
           data-testid="modalButtonsConfirm"
           onClick={confirm.fn}
+          disabled={confirm.disabled}
         >
           {confirm.text}
         </Button>

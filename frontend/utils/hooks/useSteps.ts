@@ -10,12 +10,14 @@ export function useSteps(
   url: string = BASE_URL,
 ) {
   const { data, error } = useSWR<Samples>(
-    `${url}/api/get-model-steps?id=${id}${amount ? `&amount=${amount}` : ''}`,
+    `${url}/api/get-model-steps?id=${encodeURIComponent(id)}${
+      amount ? `&amount=${amount}` : ''
+    }`,
     fetcher,
   )
   return {
     data: data,
-    isLoading: !error && !data,
-    isError: error,
+    isLoading: !error && data === undefined,
+    isError: error || data === null,
   }
 }

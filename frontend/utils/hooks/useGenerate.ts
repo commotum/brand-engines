@@ -1,34 +1,47 @@
 import React from 'react'
-import { useRouter } from 'next/router'
 
-import { forkModel, generateModel, renameModel, trainModel } from '../calls'
-import { getTrainRoute } from '../constants'
+import { generateModel } from '../calls'
 
 export function useGenerate(id: string, checkpoint?: string) {
   const [data, setData] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const submitting = React.useRef(false)
 
   const onGenerate = React.useCallback(
-    async ({ temperature, length, top_k, text }) => {
+    async ({ temperature, length, topK, text }) => {
+      if (submitting.current) {
+        return
+      }
+      submitting.current = true
       setLoading(true)
-      setData(
-        await generateModel(
+      setError(null)
+      try {
+        const result = await generateModel(
           id,
           temperature,
-          top_k,
+          topK,
           length,
           text,
           checkpoint,
-        ).finally(() => {
-          setLoading(false)
-        }),
-      )
+        )
+        if (result === null) {
+          throw new Error('Could not generate text. Please retry.')
+        }
+        setData(result)
+      } catch (cause) {
+        setError(cause.message || 'Could not generate text. Please retry.')
+      } finally {
+        submitting.current = false
+        setLoading(false)
+      }
     },
     [id, setData, checkpoint],
   )
 
   return {
     data,
+    error,
     onGenerate,
     isLoading: Boolean(loading),
   }

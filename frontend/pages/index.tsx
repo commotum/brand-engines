@@ -45,6 +45,8 @@ const Index: NextPage<Props> = () => {
     isOpen: isRenameOpen,
     onRename,
     onSubmit: onRenameSubmit,
+    isLoading: isRenameLoading,
+    error: renameError,
   } = useRename(refresh)
   const {
     id: trainId,
@@ -59,6 +61,8 @@ const Index: NextPage<Props> = () => {
     isLoading: isForkLoading,
     onFork,
     onForkOpen,
+    error: forkError,
+    readyName,
   } = useFork(refresh)
   const {
     onClose: onTrainClose,
@@ -66,12 +70,15 @@ const Index: NextPage<Props> = () => {
     isLoading: isTrainLoading,
     onTrainOpen,
     onContinue: onTrainContinue,
+    error: trainError,
   } = useTrain()
   const {
     onClose: onDeleteClose,
     isOpen: isDeleteOpen,
     onDeleteConfirm,
     onDelete,
+    isLoading: isDeleteLoading,
+    error: deleteError,
   } = useDelete(refresh)
 
   const onForkModal = React.useCallback(() => {
@@ -109,6 +116,7 @@ const Index: NextPage<Props> = () => {
       <Wrap>
         <TopPanel />
         <Throbber centered />
+        <p role="status">Loading models…</p>
       </Wrap>
     )
   }
@@ -116,14 +124,24 @@ const Index: NextPage<Props> = () => {
     return (
       <Wrap>
         <TopPanel />
-        Ups, Something is broken
+        <p role="alert">Could not load models.</p>
+        <button onClick={() => refresh()}>Retry</button>
       </Wrap>
     )
   }
   return (
     <Wrap>
       <TopPanel onSearch={onSearch} onSort={onSort} />
+      {readyName && <p role="status">{readyName} is ready to train</p>}
+      {data.length === 0 && (
+        <p>
+          {search ? 'No models match your search.' : 'No models available.'}
+        </p>
+      )}
       <ItemGrid
+        onViewTraining={(id) => {
+          router.push(getTrainRoute(id))
+        }}
         onRename={onRename}
         onTrain={onTrain}
         onDelete={onDelete}
@@ -136,6 +154,8 @@ const Index: NextPage<Props> = () => {
         onSubmit={onRenameSubmit}
         currentName={renameId}
         isOpen={isRenameOpen}
+        isLoading={isRenameLoading}
+        error={renameError}
       />
       <TrainOptionModal
         id={trainId}
@@ -151,17 +171,21 @@ const Index: NextPage<Props> = () => {
         onStart={onTrainContinue}
         isLoading={isTrainLoading}
         isOpen={isTrainOpen}
+        error={trainError}
       />
       <ForkModal
         onClose={onForkClose}
         onContinue={onFork}
         isLoading={isForkLoading}
         isOpen={isForkOpen}
+        error={forkError}
       />
       <DeleteModal
         onClose={onDeleteClose}
         onDelete={onDeleteConfirm}
         isOpen={isDeleteOpen}
+        isLoading={isDeleteLoading}
+        error={deleteError}
       />
     </Wrap>
   )

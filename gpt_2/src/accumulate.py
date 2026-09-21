@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import numpy as np
-import tensorflow as tf
+from gpt_2.src.tf_compat import tf
 import time
 
 

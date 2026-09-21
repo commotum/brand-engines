@@ -12,6 +12,16 @@ jest.mock('../utils/hooks/useModels')
 const MODELS = getItems(50)
 
 describe('Index', () => {
+  it('shows empty results separately from errors', () => {
+    ;(useModels as any).mockImplementationOnce(() => ({
+      data: [],
+      isLoading: false,
+      isError: false,
+    }))
+    const { getByText, queryByRole } = render(<Index />)
+    expect(getByText('No models available.')).toBeTruthy()
+    expect(queryByRole('alert')).toBeNull()
+  })
   it('default', () => {
     ;(useModels as any).mockImplementationOnce(() => ({
       data: MODELS,
@@ -41,6 +51,6 @@ describe('Index', () => {
       isError: true,
     }))
     const { getByText } = render(<Index />)
-    expect(getByText('Ups, Something is broken')).toBeTruthy()
+    expect(getByText('Could not load models.')).toBeTruthy()
   })
 })

@@ -46,6 +46,8 @@ type Props = {
   onClose(): void
   onSubmit(newName: string): void
   className?: string
+  isLoading?: boolean
+  error?: string
 }
 
 export const RenameModal: React.FC<Props> = ({
@@ -54,12 +56,16 @@ export const RenameModal: React.FC<Props> = ({
   onClose,
   currentName,
   onSubmit,
+  isLoading,
+  error,
 }) => {
   const onFormSubmit = React.useCallback(
     ({ newName }: typeof INIT_VALUES) => {
-      onSubmit(newName)
+      if (!isLoading) {
+        return onSubmit(newName)
+      }
     },
-    [onSubmit],
+    [onSubmit, isLoading],
   )
   return (
     <Modal
@@ -73,7 +79,14 @@ export const RenameModal: React.FC<Props> = ({
         validationSchema={SCHEMA}
         onSubmit={onFormSubmit}
       >
-        <Form>
+        <Form
+          onSubmitCapture={(event) => {
+            if (isLoading) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}
+        >
           <SLabel>
             Current name:
             <Text data-testid="renameModalName">{currentName}</Text>
@@ -82,10 +95,16 @@ export const RenameModal: React.FC<Props> = ({
             name="newName"
             label="New Name:"
             placeholder="Please Enter..."
+            disabled={isLoading}
           />
+          {error && <p role="alert">{error}</p>}
           <SModalButtons
-            confirm={{ text: 'Submit', fn: () => {} }}
-            cancel={{ text: 'Cancel', fn: onClose }}
+            confirm={{
+              text: isLoading ? 'Renaming…' : 'Submit',
+              fn: () => {},
+              disabled: isLoading,
+            }}
+            cancel={{ text: 'Cancel', fn: onClose, disabled: isLoading }}
           />
         </Form>
       </Formik>

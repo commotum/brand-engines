@@ -3,6 +3,7 @@ import styled, { css } from 'styled-components'
 
 import { Item } from './Item'
 import { Model } from '../@types/types'
+import { getModelDisplayName } from '../utils/constants'
 
 const Wrap = styled.div(
   ({ theme }) => css`
@@ -26,6 +27,7 @@ type Props = {
   items: Model[]
   className?: string
   onTrain?(name: string): void
+  onViewTraining?(name: string): void
   onGenerate?(name: string): void
   onRename?(name: string): void
   onDelete?(name: string): void
@@ -40,6 +42,7 @@ export const ItemGrid: React.FC<Props> = ({
   className,
   onDelete,
   onTrain,
+  onViewTraining,
 }) => {
   const onCallback = React.useCallback(
     (fn: ((name: string) => void) | undefined, name: string) => {
@@ -55,15 +58,19 @@ export const ItemGrid: React.FC<Props> = ({
 
   return (
     <Wrap className={className} data-testid="itemGrid">
-      {items.map(({ name, core }) => (
+      {items.map(({ name, core, training }) => (
         <Item
           key={name}
-          onTrain={onCallback(onTrain, name)}
+          training={training}
+          onTrain={onCallback(
+            training && onViewTraining ? onViewTraining : onTrain,
+            name,
+          )}
           onGenerate={onCallback(onGenerate, name)}
           onRename={core ? undefined : onCallback(onRename, name)}
           onDelete={core ? undefined : onCallback(onDelete, name)}
           onHistory={core ? undefined : onCallback(onHistory, name)}
-          title={name}
+          title={getModelDisplayName(name)}
         />
       ))}
     </Wrap>

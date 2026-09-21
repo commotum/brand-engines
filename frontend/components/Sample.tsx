@@ -84,15 +84,53 @@ const SampleTitle = styled.p(
   `,
 )
 
-const SampleText = styled.pre(
+const SampleText = styled.div(
   ({ theme }) => css`
-    margin-left: 3.25rem;
+    margin: 1em 0 1em 3.25rem;
     white-space: break-spaces;
     color: ${theme.color.medium};
     font-weight: 500;
     font-size: ${theme.size.default};
   `,
 )
+
+const Content = styled.div`
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+
+  > div + div {
+    margin-top: 0.75em;
+  }
+`
+
+const EOS = '<|endoftext|>'
+
+export const SampleContent: React.FC<{
+  text: string
+  pending?: boolean
+  className?: string
+}> = ({ text, pending = false, className }) => {
+  let visibleText = text
+  if (pending) {
+    for (let length = EOS.length - 1; length > 0; length -= 1) {
+      if (visibleText.endsWith(EOS.slice(0, length))) {
+        visibleText = visibleText.slice(0, -length)
+        break
+      }
+    }
+  }
+  const parts = visibleText.includes(EOS)
+    ? visibleText.split(EOS).filter((part) => part.trim().length > 0)
+    : [visibleText]
+
+  return (
+    <Content className={className}>
+      {parts.map((part, index) => (
+        <div key={index}>{part}</div>
+      ))}
+    </Content>
+  )
+}
 
 type Props = {
   title: string
@@ -135,7 +173,9 @@ export const Sample: React.FC<Props> = ({
               <SmallSampleIcon />
               Sample {i + 1}
             </SampleTitle>
-            <SampleText data-testid="sampleText">{item}</SampleText>
+            <SampleText data-testid="sampleText">
+              <SampleContent text={item} />
+            </SampleText>
           </React.Fragment>
         ))}
       </InnerWrap>

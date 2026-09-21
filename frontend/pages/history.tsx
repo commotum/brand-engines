@@ -10,7 +10,7 @@ import { useModel } from '../utils/hooks/useModel'
 import { SmartModel } from '../components/Model'
 import { useFork } from '../utils/hooks/useFork'
 import { ForkModal } from '../components/ForkModal'
-import { ROUTES } from '../utils/constants'
+import { ROUTES, getModelDisplayName } from '../utils/constants'
 
 const Wrap = styled.div`
   width: 100%;
@@ -49,63 +49,70 @@ const History: NextPage<Props> = () => {
     query: { id },
     push,
   } = useRouter()
-  console.log('history', id)
   const {
     onClose: onForkClose,
     isOpen: isForkOpen,
     isLoading: isForkLoading,
     onFork,
     onForkOpen,
+    error: forkError,
   } = useFork(async () => {
     await push(ROUTES.home)
   })
-  const { data, isLoading } = useModel(id as string)
+  const { data, isLoading, isError, refresh } = useModel(id as string)
 
   if (isLoading) {
     return (
       <Wrap>
-        <TopPanel title={`${id}`} />
+        <TopPanel title={`${getModelDisplayName(id as string)}`} />
         <Throbber centered />
+        <p role="status">Loading model history…</p>
       </Wrap>
     )
   }
 
-  if (!data) {
+  if (isError || !data) {
     return (
       <Wrap>
-        <TopPanel title={`${id}`} />
-        Something is wrong
+        <TopPanel title={`${getModelDisplayName(id as string)}`} />
+        <p role="alert">Could not load model history.</p>
+        <button onClick={() => refresh()}>Retry</button>
       </Wrap>
     )
   }
 
-  const { history } = data
+  const history = data.history || []
   const baseItem = history[history.length - 1]
 
   return (
     <Wrap>
-      <TopPanel title={`${id}`} />
+      <TopPanel title={`${getModelDisplayName(id as string)}`} />
+      {history.length === 0 && <p>No model history yet.</p>}
       {history
         .slice(0, history.length - 1)
         .map(({ id, created, steps = 0 }) => (
           <SmartModel
+            key={id}
             onFork={onForkOpen}
             id={id}
             amount={steps}
-            title={`${id} | ${format(
+            title={`${getModelDisplayName(id as string)} | ${format(
               new Date(created * 1000),
               'dd/LL/yy',
             )} | ${steps} steps`}
           />
         ))}
-      <Title>
-        <Circle /> {baseItem.id}
-      </Title>
+      {baseItem && (
+        <Title>
+          <Circle /> {getModelDisplayName(baseItem.id)}
+        </Title>
+      )}
       <ForkModal
         onClose={onForkClose}
         onContinue={onFork}
         isLoading={isForkLoading}
         isOpen={isForkOpen}
+        error={forkError}
       />
     </Wrap>
   )

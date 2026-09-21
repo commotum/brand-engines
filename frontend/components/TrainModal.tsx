@@ -5,7 +5,6 @@ import { number, object } from 'yup'
 
 import { Modal } from './Modal'
 import { Input } from './Input'
-import { Throbber } from './Throbber'
 import { Button } from './common/Button'
 
 const SInput = styled(Input)`
@@ -34,6 +33,7 @@ type ValueType = typeof INIT_VALUES
 type Props = {
   isOpen: boolean
   isLoading?: boolean
+  error?: string | null
   onClose(): void
   onStart(values: ValueType): void
   className?: string
@@ -44,6 +44,7 @@ export const TrainModal: React.FC<Props> = ({
   className,
   onStart,
   isLoading,
+  error,
   onClose,
 }) => {
   const onSubmit = React.useCallback(
@@ -53,14 +54,6 @@ export const TrainModal: React.FC<Props> = ({
     [onStart],
   )
 
-  if (isLoading) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} className={className}>
-        <Throbber centered />
-      </Modal>
-    )
-  }
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} className={className}>
       <Formik
@@ -69,19 +62,26 @@ export const TrainModal: React.FC<Props> = ({
         onSubmit={onSubmit}
       >
         <Form>
+          {error && <p role="alert">{error}</p>}
           <SInput
             name="timesteps"
+            disabled={isLoading}
             label="Timesteps:"
             placeholder="Please Enter..."
           />
           <SInput
             name="checkpoint"
+            disabled={isLoading}
             label="Checkpoint every:"
             placeholder="Please Enter..."
           />
           <ButtonWrap>
-            <Button data-testid="trainModalSubmit" type="submit">
-              Start training
+            <Button
+              data-testid="trainModalSubmit"
+              type="submit"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Starting training…' : 'Start training'}
             </Button>
           </ButtonWrap>
         </Form>

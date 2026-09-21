@@ -1,14 +1,16 @@
 import json
 import os
 import numpy as np
-import tensorflow as tf
+from gpt_2.src.tf_compat import tf
 import time
+import shutil
+from pathlib import Path
 import tqdm
 from tensorflow.core.protobuf import rewriter_config_pb2
 import gpt_2.src.model as model
 import gpt_2.src.sample as sample
 import gpt_2.src.encoder as encoder
-import gpt_2.src.memory_saving_gradients as memory_saving_gradients
+from gpt_2.src.checkpoints import latest as latest_checkpoint
 from gpt_2.src import CHECKPOINT_DIR, MODEL_DIR, SAMPLE_DIR
 from gpt_2.src.accumulate import AccumulatingOptimizer
 from gpt_2.src.load_dataset import load_dataset, Sampler
@@ -38,7 +40,7 @@ class Args():
         self.learning_rate = data.get('learning_rate', 0.00002)  # Learning rate for Adam
         self.accumulate_gradients = data.get('accumulate_gradients', 1)  # Accumulate gradients across N minibatches.
         self.memory_saving_gradients = data.get('memory_saving_gradients',
-                                                'store_true')  # Use gradient checkpointing to reduce vram usage.
+                                                True)  # Recompute activations to reduce vram usage.
         self.only_train_transformer_layers = data.get('only_train_transformer_layers',
                                                       False)  # Restrict training to the transformer blocks.
         self.optimizer = data.get('optimizer', 'adam')  # Optimizer. <adam|sgd>.
@@ -76,6 +78,8 @@ def randomize(context, hparams, p):
 
 
 def train(args):
+    if args.steps_num < 1 or args.sample_every < 1 or args.save_every < 1:
+        raise ValueError('Steps and save/sample intervals must be positive')
     logger = Logger(os.path.join(MODEL_DIR, args.model_name, args.output_file))
     enc = encoder.get_encoder(args.model_name)
     hparams = model.default_hparams()
@@ -94,10 +98,10 @@ def train(args):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     config.graph_options.rewrite_options.layout_optimizer = rewriter_config_pb2.RewriterConfig.OFF
-    with tf.Session(config=config) as sess:
+    with tf.Session(graph=tf.Graph(), config=config) as sess:
         context = tf.placeholder(tf.int32, [args.batch_size, None])
         context_in = randomize(context, hparams, args.noise)
-        output = model.model(hparams=hparams, X=context_in)
+        output = model.model(hparams=hparams, X=context_in, recompute=args.memory_saving_gradients)
         loss = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=context[:, 1:], logits=output['logits'][:, :-1]))
@@ -130,8 +134,6 @@ def train(args):
             exit('Bad optimizer:', args.optimizer)
 
         if args.accumulate_gradients > 1:
-            if args.memory_saving_gradients:
-                exit("Memory saving gradients are not implemented for gradient accumulation yet.")
             opt = AccumulatingOptimizer(
                 opt=opt,
                 var_list=train_vars)
@@ -140,10 +142,7 @@ def train(args):
             opt_apply = opt.apply_gradients()
             summary_loss = tf.summary.scalar('loss', opt_apply)
         else:
-            if args.memory_saving_gradients:
-                opt_grads = memory_saving_gradients.gradients(loss, train_vars)
-            else:
-                opt_grads = tf.gradients(loss, train_vars)
+            opt_grads = tf.gradients(loss, train_vars)
             opt_grads = list(zip(opt_grads, train_vars))
             opt_apply = opt.apply_gradients(opt_grads)
             summary_loss = tf.summary.scalar('loss', loss)
@@ -156,22 +155,19 @@ def train(args):
 
         saver = tf.train.Saver(
             var_list=all_vars,
-            max_to_keep=5,
+            max_to_keep=0,  # Preserve archived checkpoints; remove unwanted saves explicitly.
             keep_checkpoint_every_n_hours=2)
         sess.run(tf.global_variables_initializer())
 
         if args.restore_from == 'latest':
-            ckpt = tf.train.latest_checkpoint(
-                os.path.join(CHECKPOINT_DIR, args.run_name))
-            if ckpt is None:
-                # Get fresh GPT weights if new run.
-                ckpt = tf.train.latest_checkpoint(
-                    os.path.join(MODEL_DIR, args.model_name))
+            ckpt = latest_checkpoint(os.path.join(CHECKPOINT_DIR, args.run_name)) or latest_checkpoint(
+                os.path.join(MODEL_DIR, args.model_name))
         elif args.restore_from == 'fresh':
-            ckpt = tf.train.latest_checkpoint(
-                os.path.join('../models', args.model_name))
+            ckpt = latest_checkpoint(os.path.join(MODEL_DIR, args.model_name))
         else:
-            ckpt = tf.train.latest_checkpoint(args.restore_from)
+            ckpt = latest_checkpoint(args.restore_from) if os.path.isdir(args.restore_from) else args.restore_from
+        if ckpt is None:
+            raise ValueError('No complete checkpoint to resume')
         logger.out(f"Loading checkpoint {ckpt}")
         saver.restore(sess, ckpt)
 
@@ -193,17 +189,19 @@ def train(args):
             val_batches = [[val_data_sampler.sample(1024) for _ in range(args.val_batch_size)]
                            for _ in range(args.val_batch_count)]
 
-        run_counter = 1
-        counter = 1
+        run_counter = 0
+        counter = 0
         counter_path = os.path.join(CHECKPOINT_DIR, args.run_name, 'counter')
         if os.path.exists(counter_path):
             # Load the step number if we're resuming a run
-            # Add 1 so we don't immediately try to save again
             with open(counter_path, 'r') as fp:
-                counter = int(fp.read()) + 1
+                counter = int(fp.read())
 
         def save():
             maketree(os.path.join(CHECKPOINT_DIR, args.run_name))
+            required = sum(p.stat().st_size for p in Path(ckpt).parent.glob(Path(ckpt).name + '.*'))
+            if shutil.disk_usage(CHECKPOINT_DIR).free < required + 1024**3:
+                raise ValueError('Not enough disk space for another checkpoint (keeping 1 GiB free)')
             logger.out(f"Saving model-{counter}")
             saver.save(
                 sess,
@@ -214,6 +212,7 @@ def train(args):
                           metafile)
             with open(counter_path, 'w') as fp:
                 fp.write(str(counter) + '\n')
+            logger.out(f"Saved model-{counter}")
 
         def generate_samples():
             logger.out('Generating samples...')
@@ -229,7 +228,7 @@ def train(args):
                     text = '======== SAMPLE {} ========\n{}\n'.format(
                         index + 1, text)
                     all_text.append(text)
-                    logger.out(text)
+                    logger.out(text + '======== END SAMPLE ========')
                     index += 1
             maketree(os.path.join(SAMPLE_DIR, args.run_name))
             with open(
@@ -256,14 +255,6 @@ def train(args):
 
         try:
             while True:
-                if run_counter >= args.steps_num:
-                    generate_samples()
-                    save()
-                    break
-                if run_counter % args.save_every == 0:
-                    save()
-                if run_counter % args.sample_every == 0:
-                    generate_samples()
                 if args.val_every > 0 and (counter % args.val_every == 0 or counter == 1):
                     validation()
 
@@ -278,6 +269,8 @@ def train(args):
                         (opt_apply, loss, summaries),
                         feed_dict={context: sample_batch()})
 
+                counter += 1
+                run_counter += 1
                 summary_log.add_summary(v_summary, counter)
 
                 avg_loss = (avg_loss[0] * 0.99 + v_loss,
@@ -286,8 +279,16 @@ def train(args):
                 logger.out(
                     f"[{counter}, {run_counter}/{args.steps_num} | {(time.time() - start_time):2.2f}] loss={v_loss:2.2f} avg={(avg_loss[0] / avg_loss[1]):2.2f}")
 
-                counter += 1
-                run_counter += 1
+                if run_counter % args.sample_every == 0 or run_counter == args.steps_num:
+                    generate_samples()
+                if run_counter % args.save_every == 0 or run_counter == args.steps_num:
+                    save()
+                if run_counter == args.steps_num:
+                    logger.out('Training completed')
+                    break
         except KeyboardInterrupt:
-            print('interrupted')
-            save()
+            logger.out('Interrupted')
+            if run_counter:
+                save()
+        finally:
+            summary_log.close()

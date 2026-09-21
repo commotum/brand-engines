@@ -1,4 +1,4 @@
-import tensorflow as tf
+from gpt_2.src.tf_compat import tf
 
 import gpt_2.src.model as model
 

@@ -1,12 +1,13 @@
 import json
 import os
 import numpy as np
-import tensorflow as tf
+from gpt_2.src.tf_compat import tf
 
 import gpt_2.src.model as model
 import gpt_2.src.sample as sample
 import gpt_2.src.encoder as encoder
 from gpt_2.src import MODEL_DIR
+from gpt_2.src.checkpoints import resolve as resolve_checkpoint
 
 
 def sample_model(
@@ -18,7 +19,8 @@ def sample_model(
         length=None,
         temperature=1,
         top_k=0,
-        top_p=0.0
+        top_p=0.0,
+        checkpoint=None
 ):
     """
     Run the sample_model
@@ -47,12 +49,15 @@ def sample_model(
     with open(os.path.join(MODEL_DIR, model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
 
+    context_tokens = enc.encode(input) if input else [enc.encoder['<|endoftext|>']]
     if length is None:
-        length = hparams.n_ctx
-    elif length > hparams.n_ctx:
+        length = hparams.n_ctx - len(context_tokens)
+    if length < 1 or length + len(context_tokens) > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
-    with tf.Session(graph=tf.Graph()) as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(graph=tf.Graph(), config=config) as sess:
         context = tf.placeholder(tf.int32, [batch_size, None])
         np.random.seed(seed)
         tf.set_random_seed(seed)
@@ -72,10 +77,11 @@ def sample_model(
         )[:, 1:]
 
         saver = tf.train.Saver()
-        ckpt = tf.train.latest_checkpoint(os.path.join(MODEL_DIR, model_name))
+        ckpt = checkpoint or resolve_checkpoint(model_name)
         saver.restore(sess, ckpt)
 
         generated = 0
+        ret = []
         while nsamples == 0 or generated < nsamples:
             if input and input != "":
                 context_tokens = enc.encode(input)
@@ -84,9 +90,8 @@ def sample_model(
                 })[:, len(context_tokens):]
             else:
                 out = sess.run(output)
-            ret = []
             for i in range(batch_size):
-                generated += batch_size
+                generated += 1
                 text = enc.decode(out[i])
                 ret.append("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                 ret.append(text)

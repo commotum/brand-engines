@@ -5,12 +5,14 @@ import { useRouter } from 'next/router'
 import { Form, Formik } from 'formik'
 import { number, object, string } from 'yup'
 
+import { getModelDisplayName } from '../utils/constants'
 import { TopPanel } from '../components/TopPanel'
 import { useGenerate } from '../utils/hooks/useGenerate'
 import { InputField } from '../components/InputField'
 import { Input } from '../components/Input'
 import { Throbber } from '../components/Throbber'
 import { Button } from '../components/common/Button'
+import { SampleContent } from '../components/Sample'
 
 const Wrap = styled.div`
   width: 100%;
@@ -46,9 +48,8 @@ const SInputField = styled(InputField)`
   }
 `
 
-const Text = styled.textarea<{ visible: number }>(
+const Text = styled.div<{ visible: number }>(
   ({ theme, visible }) => css`
-    resize: none;
     visibility: ${visible ? 'visible' : 'hidden'};
     font-size: ${theme.size.default};
     color: ${theme.color.black};
@@ -59,6 +60,7 @@ const Text = styled.textarea<{ visible: number }>(
     border: 2px solid ${theme.color.gray};
     border-radius: ${theme.radius.default};
     margin: 3rem 0;
+    padding: 0.5rem;
   `,
 )
 
@@ -87,14 +89,14 @@ const Generate: NextPage<Props> = () => {
   const {
     query: { id, count },
   } = useRouter()
-  const { data, isLoading, onGenerate } = useGenerate(
+  const { data, isLoading, error, onGenerate } = useGenerate(
     id as string,
     count as string,
   )
 
   return (
     <Wrap>
-      <TopPanel title={`${id} - Generate`} />
+      <TopPanel title={`${getModelDisplayName(id as string)} - Generate`} />
       <Formik
         initialValues={INITIAL_VALUES}
         validateOnChange
@@ -107,12 +109,19 @@ const Generate: NextPage<Props> = () => {
             name="text"
             placeholder="Please Enter, or leave blank for random ..."
           />
-          <SButton disabled={isLoading}>Generate text</SButton>
-          {isLoading && <Throbber centered />}
+          <SButton disabled={isLoading}>
+            {isLoading ? 'Generating text…' : 'Generate text'}
+          </SButton>
+          {isLoading && <Throbber />}
+          {error && <p role="alert">{error}</p>}
           <Text
-            visible={Number(!isLoading && Boolean(data))}
-            value={data || ''}
-          />
+            visible={Number(Boolean(data))}
+            role="region"
+            aria-label="Generated text"
+          >
+            {(isLoading || error) && data && <p>Previous output</p>}
+            <SampleContent text={data || ''} />
+          </Text>
           <BottomWrap>
             <Input
               label="Temperature 0.0-2.0:"

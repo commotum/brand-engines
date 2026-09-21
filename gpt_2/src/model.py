@@ -1,6 +1,6 @@
 import numpy as np
-import tensorflow as tf
-from tensorflow.contrib.training import HParams
+from gpt_2.src.tf_compat import tf
+from gpt_2.src.tf_compat import HParams, recompute_grad
 
 def default_hparams():
     return HParams(
@@ -144,7 +144,7 @@ def positions_for(tokens, past_length):
     return expand_tile(past_length + tf.range(nsteps), batch_size)
 
 
-def model(hparams, X, past=None, scope='model', reuse=tf.AUTO_REUSE):
+def model(hparams, X, past=None, scope='model', reuse=tf.AUTO_REUSE, recompute=False):
     with tf.variable_scope(scope, reuse=reuse):
         results = {}
         batch, sequence = shape_list(X)
@@ -161,11 +161,19 @@ def model(hparams, X, past=None, scope='model', reuse=tf.AUTO_REUSE):
         pasts = tf.unstack(past, axis=1) if past is not None else [None] * hparams.n_layer
         assert len(pasts) == hparams.n_layer
         for layer, past in enumerate(pasts):
-            h, present = block(h, 'h%d' % layer, past=past, hparams=hparams)
+            if recompute:
+                # Training keeps block outputs and recomputes their internals on
+                # the backward pass. The original block and weights are unchanged.
+                def forward(x, block_scope='h%d' % layer):
+                    return block(x, block_scope, past=None, hparams=hparams)[0]
+                h = recompute_grad(forward)(h)
+            else:
+                h, present = block(h, 'h%d' % layer, past=past, hparams=hparams)
+                presents.append(present)
             if layer == 10:
                 tf.add_to_collection('checkpoints', h)
-            presents.append(present)
-        results['present'] = tf.stack(presents, axis=1)
+        if presents:
+            results['present'] = tf.stack(presents, axis=1)
         h = norm(h, 'ln_f')
 
         # Language model loss.  Do tokens <n predict token n?

@@ -7,10 +7,9 @@ node_modules
 .now
 .vercel
 .env
+.env*.local
 .idea
-storybook-static
 dist
 out
-.next
 venv
 models

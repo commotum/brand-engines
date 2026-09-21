@@ -6,7 +6,6 @@ import { object, string } from 'yup'
 import { Modal } from './Modal'
 import { Input } from './Input'
 import { FileInput } from './FileInput'
-import { Throbber } from './Throbber'
 import { Button } from './common/Button'
 
 const SInput = styled(Input)`
@@ -39,6 +38,7 @@ type Props = {
   onClose(): void
   onContinue(values: ValueType): void
   className?: string
+  error?: string
 }
 
 export const ForkModal: React.FC<Props> = ({
@@ -47,21 +47,16 @@ export const ForkModal: React.FC<Props> = ({
   onContinue,
   isLoading,
   onClose,
+  error,
 }) => {
   const onSubmit = React.useCallback(
     (values: ValueType) => {
-      onContinue(values)
+      if (!isLoading) {
+        return onContinue(values)
+      }
     },
-    [onContinue],
+    [onContinue, isLoading],
   )
-
-  if (isLoading) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} className={className}>
-        <Throbber centered />
-      </Modal>
-    )
-  }
   return (
     <Modal isOpen={isOpen} onClose={onClose} className={className}>
       <Formik
@@ -69,19 +64,43 @@ export const ForkModal: React.FC<Props> = ({
         validationSchema={SCHEMA}
         onSubmit={onSubmit}
       >
-        <Form>
-          <FileInput label="Select Training Data" name="file" />
-          <SInput
-            name="name"
-            label="New Model Name:"
-            placeholder="Please Enter..."
-          />
-          <ButtonWrap>
-            <Button data-testid="uploadModalSubmit" type="submit">
-              Continue
-            </Button>
-          </ButtonWrap>
-        </Form>
+        {({ values }) => (
+          <Form
+            onSubmitCapture={(event) => {
+              if (isLoading) {
+                event.preventDefault()
+                event.stopPropagation()
+              }
+            }}
+          >
+            <fieldset
+              disabled={isLoading}
+              style={{ border: 0, padding: 0, margin: 0 }}
+            >
+              <FileInput label="Select Training Data" name="file" />
+              <SInput
+                name="name"
+                label="New Model Name:"
+                placeholder="Please Enter..."
+              />
+            </fieldset>
+            {isLoading && (
+              <p role="status">
+                Preparing {values.name} with the selected training data…
+              </p>
+            )}
+            {error && <p role="alert">{error}</p>}
+            <ButtonWrap>
+              <Button
+                data-testid="uploadModalSubmit"
+                type="submit"
+                disabled={isLoading || !values.file}
+              >
+                {isLoading ? 'Preparing…' : 'Continue'}
+              </Button>
+            </ButtonWrap>
+          </Form>
+        )}
       </Formik>
     </Modal>
   )

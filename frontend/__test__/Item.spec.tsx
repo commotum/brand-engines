@@ -12,6 +12,16 @@ export const RENAME_BUTTON = 'itemButtonRename'
 export const DELETE_BUTTON = 'itemButtonDelete'
 
 describe('Item', () => {
+  it('shows training activity and a view action', () => {
+    const onTrain = jest.fn()
+    const { getByTestId } = render(
+      <Item title="Dril" training onTrain={onTrain} />,
+    )
+    expect(getByTestId(TITLE_ID)).toHaveTextContent('Dril · Training')
+    expect(getByTestId(TRAIN_BUTTON)).toHaveValue('View training')
+    fireEvent.click(getByTestId(TRAIN_BUTTON))
+    expect(onTrain).toHaveBeenCalledTimes(1)
+  })
   it('default', () => {
     const title = 'Title'
     const { getByTestId } = render(

@@ -1,0 +1,16 @@
+{
+  "name": "brand-engines",
+  "version": "1.0.0",
+  "description": "GPT-2 brand engines: training, checkpoint branching, and generation archive",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "local": ".venv/bin/python run/local.py",
+    "start": "npm run local",
+    "download-models": ".venv/bin/python gpt_2/download_model.py 124M",
+    "test": ".venv/bin/python -m unittest discover -s tests -v && npm --prefix frontend test"
+  },
+  "architect": "Jake"
+}

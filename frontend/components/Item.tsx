@@ -148,6 +148,7 @@ type Props = {
   onDelete?(): void
   onHistory?(): void
   title: string
+  training?: boolean
 }
 
 export const Item: React.FC<Props> = ({
@@ -157,12 +158,16 @@ export const Item: React.FC<Props> = ({
   onHistory,
   onRename,
   title,
+  training,
   className,
 }) => {
   return (
     <SForm data-testid="item" className={className}>
       <HiddenInput />
-      <Title data-testid="itemTitle">{title}</Title>
+      <Title data-testid="itemTitle">
+        {title}
+        {training && <small> · Training</small>}
+      </Title>
       <ControlWrap>
         <Container>
           <TrainImage disabled={!Boolean(onTrain)} />
@@ -171,7 +176,7 @@ export const Item: React.FC<Props> = ({
             data-testid="itemButtonTrain"
             onClick={onTrain}
             type="button"
-            value="Train"
+            value={training ? 'View training' : 'Train'}
           />
         </Container>
         <Container>

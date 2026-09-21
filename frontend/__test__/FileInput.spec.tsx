@@ -52,16 +52,80 @@ describe('FileInput', () => {
   it('change', async () => {
     const spy = jest.fn()
     const value = 'value'
-    const file = { text: async () => value }
+    const file = { name: 'tweets.txt', text: async () => value }
     const { getByTestId } = render(
       <FormikWrap onSubmit={spy}>
         <FileInput label="Label" name="name" />
       </FormikWrap>,
     )
     fireEvent.change(getByTestId(INPUT_ID), { target: { files: [file] } })
+    await waitFor(() => expect(getByTestId(INPUT_ID)).not.toBeDisabled())
     fireEvent.submit(getByTestId(INPUT_ID))
 
     await waitFor(() => expect(spy).toBeCalledWith([['name', value]]))
+  })
+
+  it('describes local reading and selection without claiming an upload', async () => {
+    let finish: (value: string) => void = () => {}
+    const file = {
+      name: 'tweets.txt',
+      text: () =>
+        new Promise<string>((resolve) => {
+          finish = resolve
+        }),
+    }
+    const { getByTestId, getByRole } = render(
+      <FormikWrap>
+        <FileInput label="File" name="name" />
+      </FormikWrap>,
+    )
+    fireEvent.change(getByTestId(INPUT_ID), { target: { files: [file] } })
+    expect(getByRole('status')).toHaveTextContent('Reading tweets.txt…')
+    expect(getByTestId(INPUT_ID)).toBeDisabled()
+    finish('tweets')
+    await waitFor(() =>
+      expect(getByRole('status')).toHaveTextContent('tweets.txt selected'),
+    )
+  })
+
+  it('reads each selected file once and reports read failures', async () => {
+    const first = {
+      name: 'first.txt',
+      text: jest.fn().mockResolvedValue('first'),
+    }
+    const second = {
+      name: 'second.txt',
+      text: jest.fn().mockResolvedValue('second'),
+    }
+    const submit = jest.fn()
+    const { getByTestId, getByText } = render(
+      <FormikWrap onSubmit={submit}>
+        <FileInput label="File" name="name" />
+      </FormikWrap>,
+    )
+    fireEvent.change(getByTestId(INPUT_ID), {
+      target: { files: [first, second] },
+    })
+    await waitFor(() => expect(getByTestId(INPUT_ID)).not.toBeDisabled())
+    fireEvent.submit(getByTestId(INPUT_ID))
+    await waitFor(() =>
+      expect(submit).toHaveBeenCalledWith([['name', 'firstsecond']]),
+    )
+    fireEvent.change(getByTestId(INPUT_ID), {
+      target: {
+        files: [
+          {
+            name: 'bad.txt',
+            text: () => Promise.reject(new Error('Read failed')),
+          },
+        ],
+      },
+    })
+    await waitFor(() =>
+      expect(
+        getByText('Could not read the selected file. Please try again.'),
+      ).toBeTruthy(),
+    )
   })
 
   it('className', () => {

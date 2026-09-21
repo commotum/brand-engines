@@ -97,10 +97,40 @@ type Props = {
 }
 
 export const FileInput: React.FC<Props> = ({ className, name, label }) => {
-  const [field, { error, touched }, { setValue }] = useField(name)
+  const [
+    field,
+    { error, touched },
+    { setValue, setError, setTouched },
+  ] = useField(name)
   const [drag, setDrag] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
+  const [filename, setFilename] = React.useState('')
+  const [hasRead, setHasRead] = React.useState(false)
+  const reading = React.useRef(false)
   const isError = Boolean(error && touched) ? 1 : 0
+
+  const readFiles = async (files: File[]) => {
+    if (reading.current || !files.length) {
+      return
+    }
+    reading.current = true
+    setLoading(true)
+    setHasRead(false)
+    setDrag(false)
+    setFilename(files.map((file) => file.name).join(', '))
+    setValue('')
+    try {
+      const contents = await Promise.all(files.map((file) => file.text()))
+      await setValue(contents.join(''))
+      setHasRead(true)
+    } catch (error) {
+      await setTouched(true, false)
+      setError('Could not read the selected file. Please try again.')
+    } finally {
+      reading.current = false
+      setLoading(false)
+    }
+  }
 
   const prevent = (
     e: React.DragEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>,
@@ -128,25 +158,8 @@ export const FileInput: React.FC<Props> = ({ className, name, label }) => {
   const onDrop = React.useCallback(
     async (ev: React.DragEvent<HTMLInputElement>) => {
       prevent(ev)
-      if (loading) {
-        return
-      }
       setDrag(false)
-      setLoading(true)
-
-      if (
-        (ev as React.DragEvent<HTMLInputElement>).dataTransfer &&
-        (ev as React.DragEvent<HTMLInputElement>).dataTransfer.items
-      ) {
-        const dataTransfer = (ev as React.DragEvent<HTMLInputElement>)
-          .dataTransfer.items[0]
-        if (dataTransfer.kind === 'file') {
-          const file = dataTransfer.getAsFile()
-          setValue(await file?.text())
-        }
-      }
-
-      setLoading(false)
+      await readFiles(Array.from(ev.dataTransfer.files))
     },
     [setValue, setDrag, prevent, setLoading, loading],
   )
@@ -154,34 +167,19 @@ export const FileInput: React.FC<Props> = ({ className, name, label }) => {
   const onUpload = React.useCallback(
     async (ev: React.ChangeEvent<HTMLInputElement>) => {
       prevent(ev)
-      if (loading) {
-        return
-      }
-      setLoading(true)
-      setDrag(false)
-
-      const { files } = ev.target
-      if (files) {
-        let text = ''
-        for (let i = 0; i < files.length; i += 1) {
-          const file = files[0]
-          text += await file.text()
-        }
-        setValue(text)
-      }
-      setLoading(false)
+      await readFiles(Array.from(ev.target.files || []))
     },
     [setValue, setDrag, prevent, setLoading, loading],
   )
 
   let text = 'Drag and drop or click to browse'
-  if (field.value) {
-    text = 'Uploaded!'
+  if (field.value || hasRead) {
+    text = filename ? `${filename} selected` : 'Training data selected'
   }
   if (loading) {
-    text = 'Uploading...'
+    text = `Reading ${filename}…`
   }
-  if (drag) {
+  if (drag && !loading) {
     text = 'Drop here'
   }
 
@@ -191,11 +189,12 @@ export const FileInput: React.FC<Props> = ({ className, name, label }) => {
         {label}
       </SLabel>
       <Field isError={isError}>
-        {field.value ? <FileImage /> : <UploadImage />}
-        <UploadText>{text}</UploadText>
+        {field.value || hasRead ? <FileImage /> : <UploadImage />}
+        <UploadText role="status">{text}</UploadText>
         <SInput
           {...field}
           multiple
+          disabled={loading}
           value={undefined}
           id={label}
           data-testid="fileInputField"

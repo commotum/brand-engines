@@ -98,9 +98,12 @@ class Encoder:
 
     def encode(self, text):
         bpe_tokens = []
-        for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(' '))
+        for index, part in enumerate(text.split('<|endoftext|>')):
+            if index:
+                bpe_tokens.append(self.encoder['<|endoftext|>'])
+            for token in re.findall(self.pat, part):
+                token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
+                bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def decode(self, tokens):

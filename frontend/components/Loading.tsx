@@ -21,6 +21,11 @@ const Title = styled.h1(
   `,
 )
 
+const Indicator = styled.div`
+  width: 3.75rem;
+  height: 3.75rem;
+`
+
 const ArrowImg = styled.img.attrs<{ disabled: boolean }>(
   ({ disabled, theme }) => ({
     src: disabled ? theme.images.arrowDownGray : theme.images.arrowDown,
@@ -58,6 +63,7 @@ const ScrollButton = styled.button(
 type Props = {
   onClick?(): void
   enabled?: boolean
+  active?: boolean
   title: string
   className?: string
 }
@@ -65,16 +71,25 @@ type Props = {
 export const Loading: React.FC<Props> = ({
   onClick,
   enabled,
+  active = true,
   className,
   title,
 }) => {
   return (
     <Wrap className={className} data-testid="loading">
-      <Throbber />
-      <Title data-testid="loadingTitle">{title}</Title>
+      {(active || !enabled) && (
+        <Indicator aria-hidden="true">{active && <Throbber />}</Indicator>
+      )}
+      <Title data-testid="loadingTitle" role="status">
+        {title}
+      </Title>
       {!enabled && (
-        <ScrollButton onClick={onClick}>
-          <ArrowImg disabled={!enabled} />
+        <ScrollButton
+          onClick={onClick}
+          aria-label="Jump to latest"
+          title="Jump to latest"
+        >
+          <ArrowImg disabled={!enabled} alt="" />
         </ScrollButton>
       )}
     </Wrap>

@@ -6,13 +6,13 @@ import { Model } from '../../@types/types'
 
 export function useModel(id: string, url: string = BASE_URL) {
   const { data, error, mutate } = useSWR<Model>(
-    `${url}/api/get-model?id=${id}`,
+    id ? `${url}/api/get-model?id=${encodeURIComponent(id)}` : null,
     fetcher,
   )
   return {
     data: data,
-    isLoading: !error && !data,
-    isError: error,
+    isLoading: !error && data === undefined,
+    isError: error || data === null,
     refresh: mutate,
   }
 }

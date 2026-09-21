@@ -1,144 +1,123 @@
 import React from 'react'
 import styled, { css } from 'styled-components'
 
+import { parseTrainingLog } from '../utils/trainingLog'
+import { SampleContent } from './Sample'
 import { Loading } from './Loading'
 
 const Wrap = styled.div`
   position: relative;
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 `
 
-const OverFlow = styled.div(
-  ({ theme }) => css`
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 5rem;
-    background: linear-gradient(
-      180deg,
-      ${theme.color.white} 0%,
-      ${theme.color.whiteTransparent} 100%
-    );
-  `,
-)
+const Scroll = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+`
 
-const Scroll = styled.div(
+const Text = styled.div(
   ({ theme }) => css`
-    white-space: normal;
-    position: absolute;
-    bottom: 16.375rem;
-    left: 0;
-    width: 100%;
-    height: calc(100% - 16.375rem);
-    overflow: auto;
-  `,
-)
-
-const Text = styled.pre(
-  ({ theme }) => css`
-    display: block;
-    white-space: normal;
-    bottom: 0;
-    left: 0;
     max-width: 60rem;
     margin: 0 auto;
-    width: 100%;
-    height: 100%;
     font-size: ${theme.size.defaulish};
     color: ${theme.color.black};
-    line-height: 1;
+    line-height: 1.5;
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: inherit;
+    }
   `,
 )
 
-const Line = styled.pre(
-  ({ theme }) => css`
-    position: absolute;
-    display: block;
-    bottom: 16.25rem;
-    left: 50%;
-    margin: 0;
-    max-width: 65rem;
-    transform: translateX(-50%);
-    width: 100%;
-    height: 0.125rem;
-    background-color: ${theme.color.black};
-  `,
-)
-
-const SLoading = styled(Loading)(
-  ({ theme }) => css`
-    position: absolute;
-    bottom: 4.75rem;
-  `,
-)
+const Status = styled.div`
+  flex-shrink: 0;
+  text-align: center;
+  padding: 1rem;
+  h1 {
+    font-size: 1.125rem;
+    margin: 0 0 0.5rem;
+  }
+`
 
 type Props = {
   text: string[]
+  status?: string
+  active?: boolean
+  loading?: boolean
+  error?: string | null
+  onRetry?(): void
   className?: string
 }
 
-export const LoadingText: React.FC<Props> = ({ text, className }) => {
+export const LoadingText: React.FC<Props> = ({
+  text,
+  status = 'Reading training status…',
+  active = false,
+  loading = false,
+  error,
+  onRetry,
+  className,
+}) => {
   const textRef = React.useRef<HTMLDivElement | null>(null)
-  const [scroll, setScroll] = React.useState(true)
+  const [follow, setFollow] = React.useState(true)
+  const log = React.useMemo(() => parseTrainingLog(text), [text])
 
-  React.useLayoutEffect(() => {
-    if (!textRef.current) {
-      return
+  React.useEffect(() => {
+    const node = textRef.current
+    if (node && follow) {
+      node.scrollTop = node.scrollHeight
     }
-    const fn = () => {
-      if (!textRef.current) {
-        return
-      }
-      if (
-        textRef.current.scrollTop ===
-        textRef.current.scrollHeight - textRef.current.offsetHeight
-      ) {
-        setScroll(true)
-        return
-      }
-      setScroll(false)
-    }
-    textRef.current?.addEventListener('scroll', fn)
-    return () => {
-      textRef.current?.removeEventListener('scroll', fn)
-    }
-  }, [])
+  }, [text, follow])
 
-  React.useLayoutEffect(() => {
-    if (!textRef.current || !scroll) {
-      return
-    }
-    textRef.current.scrollTo(0, textRef.current.scrollHeight)
-  }, [text, scroll])
   return (
     <Wrap className={className} data-testid="loadingText">
-      <Scroll ref={textRef}>
+      <Scroll
+        ref={textRef}
+        onScroll={() => {
+          const node = textRef.current
+          if (node) {
+            setFollow(
+              node.scrollHeight - node.scrollTop - node.clientHeight < 48,
+            )
+          }
+        }}
+      >
         <Text data-testid="loadingTextText">
-          {new Array(5).fill(null).map((_, i) => (
-            <React.Fragment key={`emptyline-${i}`}>
-              {' '}
-              <br />
-            </React.Fragment>
+          {log.samples.map((sample, i) => (
+            <section key={i}>
+              <h2>{sample.title}</h2>
+              <SampleContent
+                text={sample.text}
+                pending={active && sample.pending}
+              />
+            </section>
           ))}
-          {text.map((line, i) => (
-            <React.Fragment key={`line-${i}`}>
-              {line}
-              <br />
-            </React.Fragment>
-          ))}
+          {!text.length && <p>No training output available yet.</p>}
+          {text.length > 0 && (
+            <details open={!log.samples.length}>
+              <summary>Training log</summary>
+              <pre>{text.join('\n')}</pre>
+            </details>
+          )}
         </Text>
       </Scroll>
-      {!scroll && <Line />}
-      <OverFlow />
-      <SLoading
-        enabled={scroll}
-        onClick={() => {
-          setScroll((prev) => !prev)
-        }}
-        title="Training in Progress"
-      />
+      <Status>
+        <Loading
+          title={status}
+          active={active || loading}
+          enabled={follow}
+          onClick={() => setFollow(true)}
+        />
+        {log.saved && <p>Last saved checkpoint: {log.saved}</p>}
+        {error && <p role="alert">{error}</p>}
+        {error && onRetry && <button onClick={onRetry}>Retry status</button>}
+      </Status>
     </Wrap>
   )
 }

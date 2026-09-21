@@ -68,4 +68,22 @@ describe('TrainModal', () => {
     )
     expect(getByRole('dialog').className.includes(className)).toBeTruthy()
   })
+
+  it('keeps entered values visible while starting and after failure', async () => {
+    const props = { isOpen: true, onClose: () => {}, onStart: () => {} }
+    const { getAllByTestId, getByTestId, getByRole, rerender } = render(
+      <TrainModal {...props} />,
+    )
+    fireEvent.change(getAllByTestId(INPUT_ID)[0], { target: { value: '120' } })
+    rerender(<TrainModal {...props} isLoading />)
+    expect(getAllByTestId(INPUT_ID)[0]).toHaveValue('120')
+    getAllByTestId(INPUT_ID).forEach((input) => expect(input).toBeDisabled())
+    expect(getByTestId(SUBMIT_ID)).toBeDisabled()
+    rerender(<TrainModal {...props} error="Backend is busy" />)
+    expect(getAllByTestId(INPUT_ID)[0]).toHaveValue('120')
+    expect(getByRole('alert')).toHaveTextContent('Backend is busy')
+    expect(getByTestId(SUBMIT_ID)).not.toBeDisabled()
+    getAllByTestId(INPUT_ID).forEach((input) => expect(input).toBeEnabled())
+    await waitFor(() => expect(getAllByTestId(INPUT_ID)[0]).toHaveValue('120'))
+  })
 })

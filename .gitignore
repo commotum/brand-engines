@@ -1,12 +1,37 @@
+# Model archives, datasets, checkpoints, samples, and training logs
+/gpt_2/models/
+/gpt_2/data/
+*.data-?????-of-?????
+*.ckpt
+*.ckpt.*
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.tfrecord
+*.tfrecords
+
+# Local dependencies and generated output
 .env/
+.venv/
 venv/
 __pycache__/
 *.py[cod]
 node_modules/
+/backend/dist/
 frontend/.next/
 frontend/out/
-backend/dist/
-gpt_2/data/
-gpt_2/models/
+.local-run/
 *.log
+.pytest_cache/
+*.tsbuildinfo
+.agents/
+.codex/
+
+# macOS metadata
 .DS_Store
+._*
