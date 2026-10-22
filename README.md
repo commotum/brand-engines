@@ -25,8 +25,6 @@ Start with [Jeff's personal favorites](sample-archive/twisted_tea/01-jeffs-favor
 
 We made it easy for anyone to create an engine with a single drag and drop interface. Pick a base model, upload a .txt file, and watch it train, generating samples all along the way.
 
-https://github.com/user-attachments/assets/f324a29f-a900-44d1-9434-db526123ba4f
-
 ## Run locally
 
 See the [local setup guide](run/local.md) for setup, model downloads, and a walkthrough. Once dependencies are installed, `npm run local` starts the interface and API at <http://127.0.0.1:3017>. Live generation and training require an NVIDIA GPU; the sample collections and video above can be viewed without installing anything. Fine-tuned weights and training datasets are not included in this repository.
