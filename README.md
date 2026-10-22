@@ -27,7 +27,7 @@ We made it easy for anyone to create an engine with a single drag and drop inter
 
 ## Run locally
 
-See the [local setup guide](run/local.md) for setup, model downloads, and a walkthrough. Once dependencies are installed, `npm run local` starts the interface and API at <http://127.0.0.1:3017>. Live generation and training require an NVIDIA GPU; the sample collections and video above can be viewed without installing anything. Fine-tuned weights and training datasets are not included in this repository.
+See the [local setup guide](run/local.md) for setup, model downloads, and a walkthrough. Once dependencies are installed, `npm run local` starts the interface and API at <http://127.0.0.1:3017>. Live generation and training require an NVIDIA GPU.
 
 ## Inside the project
 
